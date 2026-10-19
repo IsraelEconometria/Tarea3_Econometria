@@ -1,0 +1,339 @@
+---
+title: "Tarea 3 Econometría"
+author: "Israel Isaías Orta Reyna"
+date: "2026-10-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+install.packages(c("readxl", "dplyr", "car", "lmtest", "broom"))
+```
+
+
+```{r librerias}
+library(readxl)
+library(dplyr)
+library(car)
+library(lmtest)
+library(broom)
+
+archivo <- "Tarea3_Bloomberg_Datos.xlsx"
+
+excel_sheets(archivo)
+```
+
+```{r}
+tec_1_raw <- read_excel(
+  archivo,
+  sheet = "1 MIN",
+  col_names = FALSE)
+
+print(tec_1_raw[1:10, ])
+```
+
+```{r}
+limpiar_hoja <- function(hoja, tickers) {
+
+  x <- read_excel(
+    archivo,
+    sheet = hoja,
+    col_names = FALSE
+  )
+
+  pares <- list(
+    c(1,2),
+    c(4,5),
+    c(7,8),
+    c(10,11),
+    c(13,14),
+    c(16,17)
+  )
+
+  tablas <- lapply(seq_along(pares), function(i) {
+
+    datos <- data.frame(
+      FechaHora = suppressWarnings(
+        as.numeric(x[[pares[[i]][1]]][5:nrow(x)])
+      ),
+      valor = suppressWarnings(
+        as.numeric(x[[pares[[i]][2]]][5:nrow(x)])
+      )
+    )
+
+    names(datos)[2] <- tickers[i]
+
+    datos <- datos[complete.cases(datos), ]
+
+    datos
+  })
+
+  resultado <- Reduce(
+    function(a, b)
+      merge(a, b, by = "FechaHora", all = FALSE),
+    tablas
+  )
+
+  resultado <- resultado[order(resultado$FechaHora), ]
+
+  return(resultado)
+}
+```
+
+```{r}
+# TECNOLOGÍA
+tec_1 <- limpiar_hoja(
+  "1 MIN",
+  c("AAPL","MSFT","GOOGL","META","NVDA","AMZN")
+)
+
+tec_5 <- limpiar_hoja(
+  "5 MIN",
+  c("AAPL","MSFT","GOOGL","META","NVDA","AMZN")
+)
+
+tec_30 <- limpiar_hoja(
+  "30 MIN",
+  c("AAPL","MSFT","GOOGL","META","NVDA","AMZN")
+)
+
+# FINANCIERAS
+fin_1 <- limpiar_hoja(
+  "1 MIN Financieros",
+  c("JPM","BAC","C","MS","GS","WFC")
+)
+
+fin_5 <- limpiar_hoja(
+  "5 MIN Financieros",
+  c("JPM","BAC","C","MS","GS","WFC")
+)
+
+fin_30 <- limpiar_hoja(
+  "30 MIN Financieros",
+  c("JPM","BAC","C","MS","GS","WFC")
+)
+
+# ENERGÍA
+ene_1 <- limpiar_hoja(
+  "1 MIN Energeticas",
+  c("XOM","CVX","COP","SLB","OXY","EOG")
+)
+
+ene_5 <- limpiar_hoja(
+  "5 MIN Energeticas",
+  c("XOM","CVX","COP","SLB","OXY","EOG")
+)
+
+ene_30 <- limpiar_hoja(
+  "30 min Energeticas",
+  c("XOM","CVX","COP","SLB","OXY","EOG")
+)
+```
+
+```{r}
+dim(tec_1)
+dim(tec_5)
+dim(tec_30)
+
+head(tec_1)
+```
+
+```{r}
+# MODELOS TECNOLOGÍA
+m_tec_1 <- lm(AAPL ~ MSFT + GOOGL + META + NVDA + AMZN, data = tec_1)
+m_tec_5 <- lm(AAPL ~ MSFT + GOOGL + META + NVDA + AMZN, data = tec_5)
+m_tec_30 <- lm(AAPL ~ MSFT + GOOGL + META + NVDA + AMZN, data = tec_30)
+
+# MODELOS FINANCIEROS
+m_fin_1 <- lm(JPM ~ BAC + C + MS + GS + WFC, data = fin_1)
+m_fin_5 <- lm(JPM ~ BAC + C + MS + GS + WFC, data = fin_5)
+m_fin_30 <- lm(JPM ~ BAC + C + MS + GS + WFC, data = fin_30)
+
+# MODELOS ENERGÍA
+m_ene_1 <- lm(XOM ~ CVX + COP + SLB + OXY + EOG, data = ene_1)
+m_ene_5 <- lm(XOM ~ CVX + COP + SLB + OXY + EOG, data = ene_5)
+m_ene_30 <- lm(XOM ~ CVX + COP + SLB + OXY + EOG, data = ene_30)
+```
+
+```{r}
+resultados_modelos <- bind_rows(
+  glance(m_tec_1)  %>% mutate(Modelo = "Tecnologia 1 min"),
+  glance(m_tec_5)  %>% mutate(Modelo = "Tecnologia 5 min"),
+  glance(m_tec_30) %>% mutate(Modelo = "Tecnologia 30 min"),
+  
+  glance(m_fin_1)  %>% mutate(Modelo = "Financiero 1 min"),
+  glance(m_fin_5)  %>% mutate(Modelo = "Financiero 5 min"),
+  glance(m_fin_30) %>% mutate(Modelo = "Financiero 30 min"),
+  
+  glance(m_ene_1)  %>% mutate(Modelo = "Energia 1 min"),
+  glance(m_ene_5)  %>% mutate(Modelo = "Energia 5 min"),
+  glance(m_ene_30) %>% mutate(Modelo = "Energia 30 min")
+)
+
+resultados_modelos %>%
+  select(Modelo, r.squared, adj.r.squared, statistic, p.value, nobs)
+```
+
+```{r}
+modelos <- list(
+  "Tecnologia 1 min" = m_tec_1,
+  "Tecnologia 5 min" = m_tec_5,
+  "Tecnologia 30 min" = m_tec_30,
+  "Financiero 1 min" = m_fin_1,
+  "Financiero 5 min" = m_fin_5,
+  "Financiero 30 min" = m_fin_30,
+  "Energia 1 min" = m_ene_1,
+  "Energia 5 min" = m_ene_5,
+  "Energia 30 min" = m_ene_30
+)
+
+diagnosticos <- bind_rows(
+  lapply(names(modelos), function(nombre) {
+
+    modelo <- modelos[[nombre]]
+
+    v <- vif(modelo)
+    bp <- bptest(modelo)
+    dw <- dwtest(modelo)
+    bg <- bgtest(modelo, order = 1)
+
+    data.frame(
+      Modelo = nombre,
+      VIF_max = max(v),
+      BP_pvalue = bp$p.value,
+      DW = unname(dw$statistic),
+      DW_pvalue = dw$p.value,
+      BG_pvalue = bg$p.value
+    )
+  })
+)
+
+diagnosticos
+```
+
+```{r}
+diagnosticos %>%
+  select(Modelo, DW, DW_pvalue, BG_pvalue)
+```
+
+Interpretación de los supuestos: Los resultados muestran que existe multicolinealidad en todos los modelos, ya que los valores máximos del VIF son superiores a 10. En los modelos de 1 y 5 minutos también se encontró evidencia de heterocedasticidad, debido a que los p-values de Breusch-Pagan fueron menores a 0.05. Sin embargo, en los modelos de 30 minutos los p-values fueron mayores a 0.05, por lo que no se encontró evidencia de heterocedasticidad. En cuanto a la autocorrelación, las pruebas Durbin-Watson y Breusch-Godfrey muestran una presencia clara en los modelos de 1 y 5 minutos. En 30 minutos este problema disminuye, principalmente en Tecnología y Financiero, donde Breusch-Godfrey no rechazó la hipótesis de ausencia de autocorrelación. En general, la temporalidad de 30 minutos presenta un comportamiento más estable en algunos de los supuestos del modelo.
+
+```{r}
+coeficientes_modelos <- bind_rows(
+  lapply(names(modelos), function(nombre) {
+    
+    tidy(
+      modelos[[nombre]],
+      conf.int = TRUE
+    ) %>%
+      mutate(Modelo = nombre)
+    
+  })
+)
+
+coeficientes_modelos %>%
+  select(Modelo, term, estimate, std.error, statistic, p.value, conf.low, conf.high)
+```
+
+```{r}
+significancia <- coeficientes_modelos %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    Significativa = ifelse(p.value < 0.05, "Si", "No")
+  ) %>%
+  select(Modelo, term, estimate, p.value, Significativa)
+
+significancia
+```
+
+```{r}
+significativas <- significancia %>%
+  filter(Significativa == "Si")
+
+significativas
+```
+
+Interpretación de los coeficientes
+
+Tecnología: En los modelos de 1 y 5 minutos, MSFT, GOOGL, NVDA y AMZN resultaron estadísticamente significativas para explicar los movimientos de AAPL, mientras que META no fue significativa. MSFT y AMZN presentaron una relación positiva con AAPL, mientras que GOOGL y NVDA mostraron una relación negativa. En el modelo de 30 minutos, MSFT, GOOGL y NVDA continuaron siendo significativas, mientras que META y AMZN dejaron de serlo.
+
+Sector financiero: En los modelos de 1 y 5 minutos las cinco variables, BAC, C, MS, GS y WFC, fueron estadísticamente significativas para explicar a JPM. BAC, C y WFC mostraron coeficientes positivos, mientras que MS y GS presentaron coeficientes negativos. En 30 minutos únicamente BAC, GS y WFC resultaron significativas, mientras que C y MS dejaron de serlo.
+
+Energía: En el modelo de 1 minuto las cinco variables fueron significativas para explicar a XOM. CVX, COP y EOG presentaron relaciones positivas, mientras que SLB y OXY mostraron relaciones negativas. En 5 minutos, OXY dejó de ser significativa. Finalmente, en 30 minutos únicamente CVX y COP conservaron significancia estadística.
+
+En general, se observa que al aumentar la temporalidad disminuye el número de variables estadísticamente significativas. Esto indica que algunas relaciones que aparecen con datos de alta frecuencia pierden fuerza cuando se utilizan intervalos más amplios.
+
+Los nueve modelos fueron estadísticamente significativos de manera conjunta. Los modelos de Tecnología presentaron $R^2$ entre 0.8737 y 0.9242, los financieros entre 0.9170 y 0.9251 y los de Energía entre de 0.9736 y 0.9769. Por lo tanto, los modelos energéticos presentaron el mayor poder explicativo dentro de esta muestra. 
+
+## Capítulo 12 Gujarati - Autocorrelación
+
+### Pregunta 12.1
+
+a) **Falso.** En presencia de autocorrelación, los estimadores de MCO pueden seguir siendo insesgados, pero dejan de ser eficientes, ya que no tienen varianza mínima.
+
+b) **Verdadero.** La prueba Durbin-Watson parte de los supuestos del modelo donde la varianza de los errores se mantiene constante.
+
+c) **Falso.** La transformación de primeras diferencias corresponde al caso de autocorrelación positiva perfecta, es decir, cuando $\rho = 1$, no cuando $\rho = -1$.
+
+d) **Verdadero.** Los $R^2$ no son directamente comparables porque la variable dependiente no está expresada de la misma manera en un modelo en niveles y en uno de primeras diferencias.
+
+e) **Verdadero.** Un valor significativo de Durbin-Watson puede aparecer también por una mala especificación del modelo, por ejemplo, cuando se omiten variables importantes.
+
+f) **Verdadero.** Cuando existe autocorrelación, las varianzas y errores estándar calculados de la manera convencional dejan de ser confiables, lo que también afecta las pruebas de significancia.
+
+g) **Verdadero.** Omitir variables importantes puede generar un patrón sistemático en los residuos y provocar un valor significativo de Durbin-Watson.
+
+h) **Falso.** El estadístico g de Berenblutt-Webb permite probar $H_0:\rho=1$, mientras que la prueba Durbin-Watson tradicional utiliza como hipótesis nula $\rho=0$.
+
+i) **Verdadero.** Al obtener primeras diferencias, una tendencia lineal del modelo original genera una constante y una tendencia cuadrática genera un término lineal. Por eso, encontrar constante y tendencia lineal en diferencias es consistente con tendencias lineal y cuadrática en el modelo original.
+
+### Pregunta 12.2
+
+Para 50 observaciones y 4 variables explicativas, al 5% se tienen aproximadamente:
+
+$d_L = 1.378$ y $d_U = 1.721$.
+
+a) **d = 1.05:** Como $1.05 < d_L$, existe evidencia de autocorrelación positiva.
+
+b) **d = 1.40:** Como se encuentra entre $d_L$ y $d_U$, el resultado cae en la zona de indecisión.
+
+c) **d = 2.50:** Como $d = 2.50$ se encuentra entre $4-d_U = 2.279$ y $4-d_L = 2.622$, el resultado cae en la zona de indecisión respecto a autocorrelación negativa.
+
+d) **d = 3.97:** Como $4-d = 0.03 < d_L$, existe evidencia de autocorrelación negativa.
+
+### Pregunta 12.3
+
+**a)** En el Modelo A, el estadístico Durbin-Watson es 0.8252, lo que muestra evidencia de autocorrelación positiva. En el Modelo B, el estadístico aumenta a 1.82 y ya no presenta evidencia clara de autocorrelación.
+
+**b)** La autocorrelación del Modelo A parece explicarse por un problema de especificación. El modelo solamente incluye una tendencia lineal, mientras que el Modelo B agrega también el término cuadrático $t^2$. Al incluirlo, el estadístico Durbin-Watson mejora considerablemente.
+
+**c)** Para distinguir entre autocorrelación pura y un error de especificación se puede volver a estimar el modelo incorporando las variables o la forma funcional que pudieron haberse omitido. Si después de corregir la especificación desaparece la autocorrelación, el problema provenía de la especificación. Si permanece, existe mayor evidencia de autocorrelación pura.
+
+
+### Portafolio en HowTheMarketWorks
+
+![Posiciones del portafolio](portafolio_howthemarketworks.png)
+
+El portafolio se construyó con AAPL, JPM y XOM, que corresponden a las acciones dependientes utilizadas en los modelos de Tecnología, Financiero y Energía. La intención fue mantener exposición a tres sectores diferentes y distribuir aproximadamente la misma cantidad de capital en cada posición.
+
+Al momento de la captura, XOM presentaba una ganancia de 0.15%, mientras que JPM registraba una pérdida de 0.33% y AAPL una pérdida de 0.66%. El resultado todavía es pequeño en comparación con el capital invertido, por lo que considero que aún no existe suficiente información para evaluar de manera definitiva el desempeño de la estrategia.
+
+Los modelos mostraron un poder explicativo alto, especialmente en Energía. Sin embargo, también se detectaron problemas de multicolinealidad y autocorrelación, principalmente en las temporalidades más cortas. Por esta razón, los resultados se utilizan como una referencia para analizar relaciones entre las acciones y no como una predicción exacta de sus movimientos futuros.
+
+
+## Comparación con los modelos originales
+
+Al comparar los modelos intradía con los modelos que realicé anteriormente utilizando información de mayor plazo, se observan algunas diferencias importantes.
+
+En Tecnología, el modelo original presentó un $R^2$ aproximado de 0.8253, mientras que los modelos intradía presentaron valores entre 0.8737 y 0.9242. Esto indica que dentro del periodo intradía las variables seleccionadas explicaron una mayor proporción de los movimientos de AAPL.
+
+En el sector financiero, el modelo original obtuvo un $R^2$ de aproximadamente 0.9563. Los modelos intradía se ubicaron entre 0.9170 y 0.9251, por lo que su poder explicativo fue ligeramente menor.
+
+En Energía, el modelo original presentó un $R^2$ de aproximadamente 0.8925, mientras que los modelos intradía tuvieron valores cercanos a 0.974. En este caso se observa una mejora considerable en el ajuste dentro de las temporalidades de corto plazo.
+
+También se encontró que los modelos de 1 y 5 minutos presentaron mayores problemas de heterocedasticidad y autocorrelación. Al utilizar 30 minutos estos problemas disminuyeron, aunque continuó existiendo multicolinealidad. Esto muestra que un $R^2$ elevado por sí solo no significa que el modelo cumpla correctamente con todos los supuestos estadísticos.
+
+La comparación debe tomarse como una referencia, ya que los modelos intradía incorporan cinco variables independientes, mientras que los modelos originales utilizaban una especificación diferente.
